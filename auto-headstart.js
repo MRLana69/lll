@@ -8,6 +8,9 @@
   var ROUNDS = 3;
   var DELAY = 60;
   var AUTO_START_DELAY = 1200;
+  // Centro do headstart vermelho, medido dentro da área visível do jogo.
+  var HEADSTART_X = 0.153;
+  var HEADSTART_Y = 0.903;
   var activeCanvas = null;
   var running = false;
 
@@ -55,20 +58,15 @@
     send(target, 'mouseup', window.MouseEvent, x, y, 0);
     send(target, 'click', window.MouseEvent, x, y, 0);
   }
-  function indicator(x, y) {
-    var dot = document.createElement('div');
-    dot.style.cssText = 'position:fixed;width:26px;height:26px;border-radius:50%;pointer-events:none;z-index:2147483647;transform:translate(-50%,-50%);background:#00d9ff;box-shadow:0 0 18px #00d9ff;left:' + x + 'px;top:' + y + 'px;';
-    document.body.appendChild(dot);
-    setTimeout(function () { dot.remove(); }, 260);
-  }
   function headstartPoint(target) {
     var rect = target.getBoundingClientRect();
     if (!rect.width || !rect.height) return null;
-    var maxX = Math.max(1, rect.width - 24), maxY = Math.max(1, rect.height - 24);
-    var rawX = Math.min(rect.width * 0.16, rect.height * 0.16 * (608 / 1080));
-    var rawY = rect.height * 0.82;
-    return { x:Math.round(rect.left + Math.min(maxX, Math.max(Math.min(48, maxX), rawX))),
-      y:Math.round(rect.top + Math.min(maxY, Math.max(Math.min(80, maxY), rawY))) };
+    // As proporções acompanham o redimensionamento do canvas e as barras do navegador.
+    var localX = rect.width * HEADSTART_X;
+    var localY = rect.height * HEADSTART_Y;
+    var maxX = Math.max(0, rect.width - 1), maxY = Math.max(0, rect.height - 1);
+    return { x:Math.round(rect.left + Math.min(maxX, Math.max(0, localX))),
+      y:Math.round(rect.top + Math.min(maxY, Math.max(0, localY))) };
   }
   function run(source) {
     if (running || document.hidden) return false;
@@ -84,7 +82,6 @@
           var current = canvas() || target;
           var p = headstartPoint(current);
           if (!p) return;
-          indicator(p.x, p.y);
           clickCanvas(current, p.x, p.y);
           window.dispatchEvent(new CustomEvent('surf:auto-headstart', { detail:{ round:round + 1, total:ROUNDS, source:source } }));
         }, DELAY * i);
@@ -93,23 +90,7 @@
     setTimeout(function () { running = false; }, DELAY * (ROUNDS - 1) + 300);
     return true;
   }
-  function updateButton(button, enabled) {
-    button.innerHTML = 'AUTO HEADSTART: ' + (enabled ? 'ON' : 'OFF') + '<small>3 ativações · tecla B</small>';
-    button.dataset.enabled = enabled ? 'true' : 'false';
-    button.style.background = enabled ? '#00a8ff' : 'rgba(13,16,31,.92)';
-    button.style.color = enabled ? '#06111c' : '#dbeaff';
-  }
-  function installUI() {
-    var style = document.createElement('style');
-    style.textContent = '#surf-auto-headstart{position:fixed;right:14px;bottom:14px;z-index:2147483646;border:1px solid #00a8ff;border-radius:8px;padding:10px 13px;background:rgba(13,16,31,.92);color:#dbeaff;font:700 10px/1 Arial,sans-serif;letter-spacing:.08em;cursor:pointer;box-shadow:0 4px 18px rgba(0,0,0,.35);touch-action:manipulation}#surf-auto-headstart small{display:block;margin-top:5px;color:inherit;opacity:.7;font-size:8px;letter-spacing:.04em}';
-    document.head.appendChild(style);
-    var button = document.createElement('button');
-    button.id = 'surf-auto-headstart';
-    button.type = 'button';
-    button.innerHTML = 'AUTO HEADSTART: OFF<small>3 ativações · tecla B</small>';
-    button.addEventListener('click', function () { var next = !readEnabled(); writeEnabled(next); updateButton(button, next); });
-    document.body.appendChild(button);
-    updateButton(button, readEnabled());
+  function install() {
     document.addEventListener('keydown', function (event) {
       if (event.code !== HOTKEY || event.repeat || event.target && /INPUT|TEXTAREA|SELECT/.test(event.target.tagName)) return;
       if (!readEnabled()) return;
@@ -123,7 +104,7 @@
       }
     });
   }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', installUI, { once:true });
-  else installUI();
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, { once:true });
+  else install();
   window.SurfAutoHeadstart = { enable:function () { writeEnabled(true); }, disable:function () { writeEnabled(false); }, run:run, isEnabled:readEnabled };
 })();
