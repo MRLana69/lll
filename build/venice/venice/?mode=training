@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,shrink-to-fit=no"/>
+  <title>Subway Surfers: Venice | Ashuni (Legacy)</title>
+  <link rel="icon" type="image/svg+xml" href="/icon/subway/favicon.svg">
+  <link rel="icon" type="image/x-icon" href="/icon/subway/favicon.ico">
+  <link rel="shortcut icon" href="/icon/subway/favicon.ico" type="image/x-icon">
+  <link rel="stylesheet" href="/css/save-popup.css">
+  <script>
+    window.parent.showUnitywebNoSupport = window.parent.showUnitywebNoSupport || function () {
+      console.warn('Unity web support/load failed');
+    };
+  </script>
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const selectedMode = urlParams.get('mode') || 'original';
+    const isTraining = selectedMode !== 'original';
+
+    window.config = {
+      loader: "unity",
+      debug: false,
+      maxRatio: 16 / 9,
+      minRatio: 9 / 16,
+      title: "Venice | Ashuni",
+      unityVersion: "2019.2.0f1",
+      unityWebglBuildUrl: isTraining
+        ? "https://build-cdn.ashuni.lol/legacy-builds/Build/venice/venice.training.json"
+        : "https://build-cdn.ashuni.lol/legacy-builds/Build/venice/venice.alt.json",
+      fileSize: 56,
+    };
+  </script>
+<script data-reborn-map="legacy-native" src="/js/native-options.legacy-mobile-v1.js"></script></head>
+<body>
+  <script src="/js/mobile-support.js?v=11"></script>
+  <script src="/js/4399.legacy-native-v1.js"></script>
+  <script src="/js/master-loader.legacy-mobile-v1.js"></script>
+<!-- Cloudflare Pages Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "64044582781d4eba9392b234e04a2ef1"}'></script><!-- Cloudflare Pages Analytics --><script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" data-cf-beacon='{"version":"2024.11.0","token":"29a7026a679e407ea0093110637344e7","r":1,"spa":2}' crossorigin="anonymous"></script>
+</body>
+</html>
+
+
+
