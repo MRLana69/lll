@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+  <title>Subway ReLegacy</title>
+  <style>
+  *{box-sizing:border-box}
+  html,body,#game{width:100%;height:100%;margin:0;overflow:hidden;background:#000}
+  canvas{width:100%!important;height:100%!important;display:block}
+  #loading{position:fixed;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;background:#000;color:#fff;font-family:Arial,Helvetica,sans-serif;text-align:center;transition:opacity .25s,visibility .25s}
+  #loading.done{opacity:0;visibility:hidden;pointer-events:none}
+  .loader-frame{display:flex;flex-direction:column;align-items:center;gap:12px;padding:20px}
+  .loader-title{margin:0;font-size:18px;font-weight:400;letter-spacing:0;text-transform:none}
+  .loader-dots{font-size:22px;line-height:1;letter-spacing:4px;color:#fff}
+  .loader-internal{display:none!important}
+
+  #game-fullscreen{position:fixed;top:10px;right:10px;z-index:20;width:44px;height:44px;padding:0;border:1px solid rgba(255,255,255,.45);border-radius:8px;background:rgba(0,0,0,.55);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.8}
+  #game-fullscreen svg{width:23px;height:23px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  #game-fullscreen:focus-visible{outline:2px solid #fff;outline-offset:2px}
+
+</style>
+  <script src="./4399.z.js?v=surfvt14-5"></script>
+  <script src="./UnityLoader.2019.2.js?v=surfvt14-4"></script>
+  <script src="./unlock-all.js"></script>
+  <script src="./infinite-save.js"></script>
+  <script src="./auto-headstart.js"></script>
+</head>
+<body>
+  <div id="game"></div>
+  <div id="loading"><div class="loader-frame"><h1 class="loader-title">Carregando Subway Surfers</h1><div class="loader-dots" aria-hidden="true">...</div><div class="loader-internal"><p id="mode"></p><div id="status"><i></i><span>CARREGANDO ARQUIVOS</span></div><div id="fill"></div><div id="percent">0%</div><span id="device"></span><span id="webgl"></span><div id="error"></div><button id="retry" type="button">TENTAR NOVAMENTE</button></div></div></div>
+
+
+  <button id="game-fullscreen" type="button" aria-label="Tela cheia" title="Tela cheia">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5M3 3l7 7M16 3h5v5m0-5-7 7M8 21H3v-5m0 5 7-7m6 7h5v-5m0 5-7-7"/></svg>
+  </button>
+  <script>
+  (function(){var b=document.getElementById('game-fullscreen');function active(){return !!(document.fullscreenElement||document.webkitFullscreenElement);}function update(){b.setAttribute('aria-label',active()?'Sair da tela cheia':'Tela cheia');b.title=active()?'Sair da tela cheia':'Tela cheia';}b.addEventListener('click',function(){if(active()){var exit=document.exitFullscreen||document.webkitExitFullscreen;if(exit){try{var p=exit.call(document);if(p&&p.catch)p.catch(function(){});}catch(e){}}return;}var target=document.documentElement;var request=target.requestFullscreen||target.webkitRequestFullscreen;if(request){try{var p=request.call(target);if(p&&p.catch)p.catch(function(){});}catch(e){}}});document.addEventListener('fullscreenchange',update);document.addEventListener('webkitfullscreenchange',update);update();})();
+  </script>
+
+
+  <script>
+    (function () {
+      var params = new URLSearchParams(location.search);
+      var configPath = './build/venice/venice.alt.json';
+      var isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && Math.min(screen.width, screen.height) < 900);
+      var modeName = 'Venice normal · recorde ativo';
+      document.getElementById('mode').textContent = modeName;
+      window.__surfVT14 = { map: 'Venice normal', version: '2019.2.0f1', record: true };
+      function announce(type, extra) { try { parent.postMessage(Object.assign({ type: type, map: 'venice' }, extra || {}), '*'); } catch (e) {} }
+      function noResult() { return Promise.resolve(); }
+
+      // Atalhos inspirados no WASD.ahk enviado: W/A/S/D viram as quatro setas
+      // antes de chegar ao canvas Unity. As setas nativas continuam funcionando.
+      (function installKeyboardBridge() {
+        var codes = { ArrowUp: 38, ArrowLeft: 37, ArrowDown: 40, ArrowRight: 39 };
+        var movement = { i: 'ArrowUp', j: 'ArrowLeft', k: 'ArrowDown', l: 'ArrowRight' };
+        try {
+          var rawSettings = params.get('hubSettings');
+          var settings = rawSettings ? JSON.parse(rawSettings) : {};
+          var scheme = settings.controls || 'WASD';
+          if (scheme === 'IJKL') movement = { i: 'ArrowUp', j: 'ArrowLeft', k: 'ArrowDown', l: 'ArrowRight' };
+          else if (scheme === 'SETAS') movement = { arrowup: 'ArrowUp', arrowleft: 'ArrowLeft', arrowdown: 'ArrowDown', arrowright: 'ArrowRight' };
+          else if (scheme === 'PERSONALIZADO') {
+            var custom = settings.customControls || {};
+            movement = {};
+            movement[String(custom.up || 'T').toLowerCase()] = 'ArrowUp';
+            movement[String(custom.left || 'F').toLowerCase()] = 'ArrowLeft';
+            movement[String(custom.down || 'G').toLowerCase()] = 'ArrowDown';
+            movement[String(custom.right || 'H').toLowerCase()] = 'ArrowRight';
+          }
+        } catch (e) {}
+        function normalize(value) {
+          var key = String(value || '').toLowerCase();
+          return ({ '↑': 'arrowup', '←': 'arrowleft', '↓': 'arrowdown', '→': 'arrowright' })[key] || key;
+        }
+        function makeEvent(type, mapped, repeat) {
+          var synthetic = new KeyboardEvent(type, { key: mapped, code: mapped, bubbles: true, cancelable: true, repeat: !!repeat });
+          try {
+            Object.defineProperty(synthetic, 'keyCode', { value: codes[mapped] || 0 });
+            Object.defineProperty(synthetic, 'which', { value: codes[mapped] || 0 });
+            Object.defineProperty(synthetic, '__surfVT14Forwarded', { value: true });
+          } catch (e) {}
+          return synthetic;
+        }
+        function forward(event) {
+          if (event.__surfVT14Forwarded) return;
+          var key = normalize(event.key);
+          if (key === 'q' && event.type === 'keydown' && !event.repeat) { announce('SURFVT14_TIMER_TOGGLE'); event.preventDefault(); return; }
+          if (key === 'r' && event.type === 'keydown' && !event.repeat) { announce('SURFVT14_TIMER_RESET'); event.preventDefault(); return; }
+          var mapped = movement[key];
+          if (!mapped) return;
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          var synthetic = makeEvent(event.type, mapped, event.repeat);
+          dispatchToUnity(synthetic);
+        }
+        window.addEventListener('message', function(event) {
+          var data = event.data || {};
+          if (data.type !== 'SURFVT14_KEY') return;
+          var mapped = data.key || '';
+          var synthetic = makeEvent(data.eventType || 'keydown', mapped, data.repeat);
+          dispatchToUnity(synthetic);
+        });
+        window.addEventListener('keydown', forward, true);
+        window.addEventListener('keyup', forward, true);
+        function dispatchToUnity(event) {
+          var canvas = document.querySelector('canvas');
+          // Unity 2019 registra o teclado no document/window. O dispatch no
+          // document também borbulha até window, sem depender de o canvas
+          // possuir foco ou de o clique ter ocorrido dentro do WebGL.
+          try { document.dispatchEvent(event); } catch (e) {
+            try { window.dispatchEvent(event); } catch (ignored) {}
+          }
+          if (canvas) {
+            try { canvas.focus(); } catch (e) {}
+          }
+        }
+      })();
+
+      // ---- Ponte Poki -> Unity -------------------------------------------------
+      // O build original usa o Poki SDK para liberar a inicialização do jogo.
+      // Mesmo em modo local/offline, o Unity precisa receber o sinal "ready"
+      // depois que initPokiBridge() for chamado. Sem isso o jogo pode ficar preso
+      // na tela de dica/loading mesmo com os arquivos WebGL já baixados.
+      var bridgeName = null;
+      var BRIDGE_FALLBACKS = ['PokiUnitySDK', 'PokiSDK'];
+      var pokiReady = false;
+
+      function sendToUnity(method, arg) {
+        var inst = window.unityInstance;
+        if (!inst || typeof inst.SendMessage !== 'function') return false;
+        var targets = bridgeName ? [bridgeName] : BRIDGE_FALLBACKS;
+        var sent = false;
+        targets.forEach(function (target) {
+          try {
+            if (arg === undefined) inst.SendMessage(target, method);
+            else inst.SendMessage(target, method, arg);
+            sent = true;
+          } catch (e) { /* GameObject alternativo pode não existir. */ }
+        });
+        return sent;
+      }
+
+      function notifyPokiReady() {
+        if (!pokiReady || !bridgeName) return;
+        // É o callback usado pelo Poki/Unity original.
+        sendToUnity('ready');
+      }
+
+      function afterPromise(promiseLike, done) {
+        var called = false;
+        function once(value) {
+          if (called) return;
+          called = true;
+          window.setTimeout(function () { done(value); }, 0);
+        }
+        try { Promise.resolve(promiseLike).then(once, function () { once(false); }); } catch (e) { once(false); }
+      }
+
+
+      // Configurações recebidas do hub: volume, limite de FPS e modo de exibição.
+      window.__surfVT14Settings = window.__surfVT14Settings || {};
+      // A opção UNLOCKED precisa escapar do limite nativo do requestAnimationFrame.
+      // Os modos numéricos continuam respeitando o limite escolhido pelo usuário.
+      // Read the hub settings from the URL before Unity creates its first
+      // animation loop. A postMessage can arrive too late on fast desktop and
+      // mobile loads, so the initial cap must be synchronous.
+      try {
+        var initialHubSettings = params.get('hubSettings');
+        var initialSettings = initialHubSettings ? JSON.parse(initialHubSettings) : {};
+        window.__surfVT14FrameCap = String(initialSettings.fpsCap || 'unlocked');
+      } catch (e) { window.__surfVT14FrameCap = 'unlocked'; }
+      (function installFrameScheduler() {
+        var nativeRAF = window.requestAnimationFrame ? window.requestAnimationFrame.bind(window) : null;
+        var nativeCancel = window.cancelAnimationFrame ? window.cancelAnimationFrame.bind(window) : null;
+        function normalizedCap() {
+          var cap = String(window.__surfVT14FrameCap || 'unlocked').toLowerCase();
+          return cap === '30' || cap === '60' || cap === '120' || cap === '240' ? cap : 'unlocked';
+        }
+        window.__surfVT14SetFrameCap = function (cap) {
+          var value = String(cap || 'unlocked').toLowerCase();
+          window.__surfVT14FrameCap = /^(30|60|120|240)$/.test(value) ? value : 'unlocked';
+          document.documentElement.dataset.surfvt14FpsCap = window.__surfVT14FrameCap;
+        };
+        window.requestAnimationFrame = function (callback) {
+          var cap = normalizedCap();
+          if ((cap === 'unlocked' || cap === '60') && nativeRAF) return nativeRAF(callback);
+          var interval = Math.max(1, 1000 / Number(cap) || 16.67);
+          return window.setTimeout(function () { callback(performance.now()); }, interval);
+        };
+        window.cancelAnimationFrame = function (id) {
+          window.clearTimeout(id);
+          if (nativeCancel) nativeCancel(id);
+        };
+        window.__surfVT14SetFrameCap(window.__surfVT14FrameCap);
+      })();
+
+      function applySurfVT14Settings(settings) {
+        settings = settings || {};
+        window.__surfVT14Settings = Object.assign(window.__surfVT14Settings, settings);
+        var volume = Math.max(0, Math.min(100, Number(settings.volume == null ? 100 : settings.volume)));
+        document.documentElement.style.setProperty('--surfvt14-volume', String(volume / 100));
+        window.__surfVT14SetFrameCap ? window.__surfVT14SetFrameCap(settings.fpsCap) : (window.__surfVT14FrameCap = settings.fpsCap || 'unlocked');
+        if (window.unityInstance && typeof window.unityInstance.SendMessage === 'function') {
+          ['AudioListener', 'GameManager', 'PokiUnitySDK'].forEach(function (target) {
+            try { window.unityInstance.SendMessage(target, 'SetVolume', String(volume / 100)); } catch (e) {}
+          });
+        }
+      }
+      window.addEventListener('message', function (event) {
+        if (!event.data) return;
+        if (event.data.type === 'SURFVT14_HUB_SETTINGS') applySurfVT14Settings(event.data.settings);
+        if (event.data.type === 'SURFVT14_FRAME_CAP') { window.__surfVT14SetFrameCap ? window.__surfVT14SetFrameCap(event.data.fpsCap) : (window.__surfVT14FrameCap = event.data.fpsCap || 'unlocked'); }
+      });
+
+      window.initPokiBridge = function (name) {
+        if (name) {
+          bridgeName = String(name);
+          window.pokiBridge = bridgeName;
+          notifyPokiReady();
+        }
+      };
+
+      window.commercialBreak = function () {
+        afterPromise(window.PokiSDK.commercialBreak(), function () {
+          // Nomes usados pelo build original. Mantemos aliases para builds
+          // que usam a grafia antiga.
+          sendToUnity('commercialBreakCompleted');
+          sendToUnity('commercialBreakCallBack');
+          sendToUnity('commercialBreakCallback');
+        });
+      };
+
+      window.rewardedBreak = function () {
+        afterPromise(window.PokiSDK.rewardedBreak(), function (withReward) {
+          var v = withReward ? 'true' : 'false';
+          sendToUnity('rewardedBreakCompleted', v);
+          sendToUnity('rewardedBreakCallBack', v);
+        });
+      };
+
+      window.PokiSDK = {
+        init: function () {
+          pokiReady = true;
+          window.pokiReady = true;
+          notifyPokiReady();
+          return Promise.resolve();
+        },
+        setDebug: function () {},
+        commercialBreak: noResult,
+        customEvent: noResult,
+        destroyAd: function () {},
+        displayAd: function () {},
+        gameInteractive: function () {},
+        gameLoadingFinished: function () {},
+        gameLoadingProgress: function () {},
+        gameLoadingStart: function () {},
+        gameplayStart: function () {},
+        gameplayStop: function () {},
+        happyTime: function () {},
+        rewardedBreak: function () { return Promise.resolve(true); },
+        roundEnd: function () {},
+        roundStart: function () {},
+        setPlayerAge: function () {},
+        togglePlayerAdvertisingConsent: function () {}
+      };
+      window.pokiReady = false;
+      window.pokiAdBlock = false;
+      // O Poki original resolve o init antes de criar o UnityLoader.
+      window.PokiSDK.init();
+
+      window.showUnitywebNoSupport = function () {
+        document.getElementById('mode').textContent = 'Não foi possível iniciar o WebGL';
+      };
+      try { parent.showUnitywebNoSupport = window.showUnitywebNoSupport; } catch (e) {}
+
+      // ---- Armazenamento seguro (pode lançar SecurityError em iframe/3rd-party) ----
+      var saveReloadKey = 'surfvt14-venice-save-ready';
+      function store(op, key, value) {
+        try {
+          if (op === 'get') return window.sessionStorage.getItem(key);
+          if (op === 'set') window.sessionStorage.setItem(key, value);
+          if (op === 'remove') window.sessionStorage.removeItem(key);
+        } catch (e) {}
+        return null;
+      }
+
+      var announcedReady = false;
+      var watchdogArmed = false;
+      function withTimeout(promise, ms, fallback) {
+        return new Promise(function (resolve) {
+          var timer = window.setTimeout(function () { resolve(fallback); }, ms);
+          promise.then(function (v) { window.clearTimeout(timer); resolve(v); },
+                       function () { window.clearTimeout(timer); resolve(fallback); });
+        });
+      }
+
+      function prepareSave() {
+        return Promise.all([
+          typeof window.applyUnlockAll === 'function' ? window.applyUnlockAll().catch(function () { return { ready: false }; }) : Promise.resolve({ ready: false }),
+          typeof window.applyInfiniteSave === 'function' ? window.applyInfiniteSave().catch(function () { return { ready: false }; }) : Promise.resolve({ ready: false })
+        ]);
+      }
+
+      function fetchWithRetry(url, options, attempts, delay) {
+        options = Object.assign({}, options || {});
+        attempts = attempts || 4; delay = delay || 500;
+        return fetch(url, options).then(function (response) {
+          if (!response.ok) throw new Error('HTTP ' + response.status);
+          return response;
+        }).catch(function (error) {
+          if (attempts <= 1) {
+            if (options.cache === 'no-store') {
+              var fallback = Object.assign({}, options, { cache: 'default' });
+              return fetch(url, fallback).then(function (response) {
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                return response;
+              });
+            }
+            throw error;
+          }
+          return new Promise(function (resolve) { window.setTimeout(resolve, delay); }).then(function () { return fetchWithRetry(url, options, attempts - 1, Math.min(delay * 2, 2200)); });
+        });
+      }
+
+      function checkBuildFiles() {
+        var configUrl = new URL(configPath, location.href);
+        return fetchWithRetry(configUrl.href, { cache: 'default' }, 4, 450).then(function (response) {
+          return response.json();
+        });
+      }
+
+      function webglReport() {
+        var canvas = document.createElement('canvas'), gl2 = null, gl1 = null;
+        try { gl2 = canvas.getContext('webgl2'); } catch (e) {}
+        try { gl1 = canvas.getContext('webgl') || canvas.getContext('experimental-webgl'); } catch (e) {}
+        return { webgl: gl2 ? 'WEBGL 2' : (gl1 ? 'WEBGL 1' : 'INDISPONÍVEL'), wasm: typeof WebAssembly !== 'undefined', mobile: isMobile };
+      }
+      function setStatus(label, error) {
+        var status = document.getElementById('status');
+        if (!status) return;
+        status.className = 'loader-status' + (error ? ' error' : '');
+        status.querySelector('span').textContent = label;
+      }
+      function reportBuildError(error) {
+        var info = webglReport();
+        var message = error && error.message ? error.message : String(error || 'Falha desconhecida no UnityLoader');
+        console.error('[surfvt14] ' + message, info);
+        setStatus('FALHA AO INICIAR', true);
+        document.getElementById('error').textContent = message + ' · ' + info.webgl + ' · WASM ' + (info.wasm ? 'OK' : 'INDISPONÍVEL');
+        document.getElementById('error').classList.add('show');
+        document.getElementById('retry').classList.add('show');
+        announce('SURFVT14_GAME_ERROR', { message: message, diagnostics: info });
+      }
+
+      function revealGame() {
+        if (announcedReady) return;
+        announcedReady = true;
+        document.getElementById('loading').classList.add('done');
+        announce('SURFVT14_GAME_PROGRESS', { progress: 1 });
+        announce('SURFVT14_GAME_READY');
+        try { if (typeof window.scheduleInfiniteSaveRefresh === 'function') window.scheduleInfiniteSaveRefresh(); } catch (e) {}
+      }
+
+      var startupRevealScheduled = false;
+      function scheduleStartupReveal() {
+        if (startupRevealScheduled) return;
+        startupRevealScheduled = true;
+        window.setTimeout(function () {
+          try { finishStartup(); } catch (e) { revealGame(); }
+        }, 350);
+      }
+
+      function finishStartup() {
+        if (store('get', saveReloadKey) === '1') {
+          store('remove', saveReloadKey);
+          revealGame();
+          return;
+        }
+        var attempts = 0;
+        function trySave() {
+          attempts += 1;
+          withTimeout(prepareSave(), 4000, [{ ready: false }]).then(function (results) {
+            var unlockResult = results[0];
+            if (unlockResult && unlockResult.ready && unlockResult.hashes) {
+              // O Unity já está inicializado; o save foi gravado no IndexedDB e será
+              // usado na próxima inicialização. Recarregar o iframe aqui fazia a
+              // instalação voltar ao loading e podia criar um loop em navegadores
+              // que particionam sessionStorage dentro de iframes.
+              revealGame();
+              return;
+            }
+            if (attempts < 12) {
+              document.getElementById('mode').textContent = modeName + ' · preparando save completo';
+              window.setTimeout(trySave, 250);
+            } else {
+              revealGame();
+            }
+          }).catch(revealGame);
+        }
+        trySave();
+      }
+
+      (function installHubRuntimeBridge() {
+        var enabled = false;
+        try { enabled = window.localStorage.getItem('surfvt14BoardTripleTap') === 'true'; } catch (e) {}
+        window.SurfVT14BoardTripleTap = { isEnabled: function(){ return enabled; }, setEnabled: function(value){ enabled=!!value; try{ window.localStorage.setItem('surfvt14BoardTripleTap', enabled?'true':'false'); }catch(e){} }, getStatus:function(){ return { enabled: enabled, taps: 3 }; } };
+        window.__surfVT14TripleTap = enabled;
+        function applyHubSaturation(level) {
+          var value = level === 'off' ? 1 : level === 'low' ? 1.25 : level === 'medium' ? 1.5 : 1.9;
+          var target = document.getElementById('game') || document.body;
+          target.style.filter = 'saturate(' + value + ')';
+          target.setAttribute('data-surfvt14-saturation', String(level || 'off'));
+        }
+        try { var savedHub = JSON.parse(window.localStorage.getItem('surfvt14-settings') || '{}'); applyHubSaturation(savedHub.saturation || 'off'); } catch (e) { applyHubSaturation('off'); }
+        window.addEventListener('message', function(event) { if (event.data && event.data.type === 'SURFVT14_HUB_SETTINGS') { var cfg = event.data.settings || {}; applyHubSaturation(cfg.saturation || 'off'); if (window.SurfVT14BoardTripleTap) window.SurfVT14BoardTripleTap.setEnabled(!!cfg.hoverboard); } });
+        function requestStorage() { try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(function(){}); } catch(e){} try { if (typeof window.applyInfiniteSave === 'function') window.applyInfiniteSave(); } catch(e){} }
+        ['pointerdown','touchstart','click','keydown'].forEach(function(type){ window.addEventListener(type, requestStorage, {capture:true, passive:true}); });
+      })();
+      (function installCompatibilityLayer() {
+        var info = webglReport();
+        document.getElementById('device').textContent = info.mobile ? 'MOBILE' : 'DESKTOP';
+        document.getElementById('webgl').textContent = info.webgl;
+        window.showUnitywebNoSupport = function () { console.warn('[surfvt14] UnityLoader compatibility warning', info); };
+        window.addEventListener('error', function (event) { if (event && event.message && /wasm|webgl|unity/i.test(event.message)) reportBuildError(event.message); });
+        window.addEventListener('unhandledrejection', function (event) { var reason = event && event.reason; if (reason) reportBuildError(reason); });
+        if (window.UnityLoader && UnityLoader.Error) UnityLoader.Error.popup = function (error) { reportBuildError(error || 'UnityLoader encontrou um erro'); };
+        if (window.UnityLoader && UnityLoader.SystemInfo) {
+          // The legacy probe can run before the canvas context is attached.
+          // Trust the live context report produced above instead.
+          UnityLoader.compatibilityCheck = function (instance, ok, fail) { info.webgl !== 'INDISPONÍVEL' ? ok() : fail('WebGL indisponível neste navegador'); };
+        }
+        document.getElementById('retry').addEventListener('click', function () {
+          document.getElementById('retry').classList.remove('show');
+          document.getElementById('error').classList.remove('show');
+          document.getElementById('fill').style.width = '0%';
+          document.getElementById('percent').textContent = '0%';
+          setStatus('TENTANDO NOVAMENTE', false);
+          var game = document.getElementById('game'); game.innerHTML = ''; window.unityInstance = null;
+          startUnity();
+        });
+      })();
+      function startUnity() {
+        setStatus('CARREGANDO ARQUIVOS', false);
+        withTimeout(window.__SURFVT14_SAVE_READY_PROMISE || prepareSave(), 9000, [{ ready: false }]).then(function () {
+          return withTimeout(checkBuildFiles(), 12000, null);
+        }).then(function (manifest) {
+          if (!manifest) throw new Error('Tempo esgotado ao carregar o manifesto Unity');
+          setStatus('INICIANDO UNITY', false);
+          var wasmUrl = new URL(manifest.wasmCodeUrl, new URL(configPath, location.href)).href;
+          return fetchWithRetry(wasmUrl, { cache: 'default' }, 4, 700).then(function (response) {
+            return response.arrayBuffer();
+          }).then(function (wasmBinary) {
+            window.unityGame = window.unityInstance = UnityLoader.instantiate('game', configPath, {
+            Module: { wasmBinary: wasmBinary, wasmTableSize: 126009, instantiateWasm: function (imports, receive) { WebAssembly.instantiate(wasmBinary, imports).then(function (result) { receive(result.instance, result.module); }).catch(function (error) { reportBuildError(error); }); return {}; }, onRuntimeInitialized: function () { setStatus('PREPARANDO A PISTA', false); pokiReady = true; window.pokiReady = true; if (!bridgeName) bridgeName = 'PokiUnitySDK'; notifyPokiReady(); try { window.PokiSDK.gameLoadingFinished(); } catch (e) {} } },
+            onProgress: function (_, value) { var raw = Number(value) || 0; var progress = Math.max(0, Math.min(1, raw > 1 ? raw / 100 : raw)); document.getElementById('fill').style.width = Math.round(progress * 100) + '%'; document.getElementById('percent').textContent = Math.round(progress * 100) + '%'; announce('SURFVT14_GAME_PROGRESS', { progress: progress }); if (progress >= 1) { setStatus('PREPARANDO A PISTA', false); if (!watchdogArmed) { watchdogArmed = true; window.setTimeout(function () { if (!announcedReady) { console.warn('[surfvt14] Unity nao confirmou a inicializacao a tempo; liberando a tela.'); revealGame(); } }, 45000); } if (isMobile && !window.__mobileWatchdogArmed) { window.__mobileWatchdogArmed = true; window.setTimeout(function () { if (!announcedReady) { console.warn('[surfvt14] watchdog mobile: liberando apos downloads concluidos.'); revealGame(); } }, 15000); } } },
+            onsuccess: function () { scheduleStartupReveal(); },
+            onerror: reportBuildError
+            });
+            window.setTimeout(function () {
+              if (!announcedReady && window.unityInstance) {
+                console.warn('[surfvt14] watchdog de inicializacao prolongada; liberando a tela.');
+                revealGame();
+              }
+            }, 90000);
+          });
+        }).catch(reportBuildError);
+      }
+
+      startUnity();
+
+      addEventListener('message', function (event) {
+        if (event.data && event.data.type === 'SURFVT14_GAME_INFO') announce('SURFVT14_GAME_READY');
+      });
+    })();
+  </script>
+
+</body>
+</html>
